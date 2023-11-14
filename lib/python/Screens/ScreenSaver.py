@@ -1,51 +1,111 @@
-from random import randrange
-from os.path import splitext
-
-from enigma import ePoint, eTimer, iPlayableService
-
-from Components.MovieList import AUDIO_EXTENSIONS
-from Components.Pixmap import Pixmap
-from Components.ServiceEventTracker import ServiceEventTracker
 from Screens.Screen import Screen
+from Components.MovieList import AUDIO_EXTENSIONS
+from Components.ServiceEventTracker import ServiceEventTracker
+from Components.Pixmap import Pixmap
+from Components.config import config
+import Screens.Standby
+from enigma import ePoint, eTimer, iPlayableService, eActionMap
+import os
+import random
+from sys import maxint
 
 
-class ScreenSaver(Screen):
+class InfoBarScreenSaver:
+	def __init__(self):
+		self.onExecBegin.append(self.__onExecBegin)
+		self.onExecEnd.append(self.__onExecEnd)
+		self.screenSaverTimer = eTimer()
+		self.screenSaverTimer.callback.append(self.screensaverTimeout)
+		self.screensaver = self.session.instantiateDialog(Screensaver)
+		self.onLayoutFinish.append(self.__layoutFinished)
+
+	def __layoutFinished(self):
+		self.screensaver.hide()
+
+	def __onExecBegin(self):
+		self.ScreenSaverTimerStart()
+
+	def __onExecEnd(self):
+		if self.screensaver.shown:
+			self.screensaver.hide()
+			eActionMap.getInstance().unbindAction('', self.keypressScreenSaver)
+		self.screenSaverTimer.stop()
+
+	def ScreenSaverTimerStart(self):
+		time = int(config.usage.screen_saver.value)
+		flag = hasattr(self, "seekstate") and self.seekstate[0]
+		if not flag:
+			ref = self.session.nav.getCurrentlyPlayingServiceOrGroup()
+			if ref and not (hasattr(self.session, "pipshown") and self.session.pipshown):
+				ref = ref.toString().split(":")
+				flag = ref[2] == "2" or os.path.splitext(ref[10])[1].lower() in AUDIO_EXTENSIONS
+		if time and flag:
+			self.screenSaverTimer.startLongTimer(time)
+		else:
+			self.screenSaverTimer.stop()
+
+	def screensaverTimeout(self):
+		if self.execing and not Screens.Standby.inStandby and not Screens.Standby.inTryQuitMainloop:
+			self.hide()
+			if hasattr(self, "pvrStateDialog"):
+				self.pvrStateDialog.hide()
+			self.screensaver.show()
+			eActionMap.getInstance().bindAction('', -maxint - 1, self.keypressScreenSaver)
+
+	def keypressScreenSaver(self, key, flag):
+		if flag:
+			self.screensaver.hide()
+			self.show()
+			self.ScreenSaverTimerStart()
+			eActionMap.getInstance().unbindAction('', self.keypressScreenSaver)
+
+
+class Screensaver(Screen):
 	def __init__(self, session):
+
+		self.skin = """
+			<screen name="Screensaver" position="fill" flags="wfNoBorder">
+				<eLabel position="fill" backgroundColor="#54111112" zPosition="0"/>
+				<widget name="picture" pixmap="openeight.png" position="0,0" size="200,92" alphatest="blend" backgroundColor="#54111112" transparent="1" zPosition="1"/>
+			</screen>"""
+
 		Screen.__init__(self, session)
-		self.skinName = ["ScreenSaver", "Screensaver"]
-		self["picture"] = Pixmap()
-		self.onShow.append(self.showScreenSaver)
-		self.onHide.append(self.hideScreenSaver)
-		self.onLayoutFinish.append(self.layoutFinished)
+
 		self.moveLogoTimer = eTimer()
 		self.moveLogoTimer.callback.append(self.doMovePicture)
+		self.onShow.append(self.__onShow)
+		self.onHide.append(self.__onHide)
+
 		self.__event_tracker = ServiceEventTracker(screen=self, eventmap={
-			iPlayableService.evStart: self.serviceStarted
-		})
+				iPlayableService.evStart: self.serviceStarted
+			})
 
-	def showScreenSaver(self):
-		self.moveLogoTimer.startLongTimer(5)
+		self["picture"] = Pixmap()
 
-	def hideScreenSaver(self):
-		self.moveLogoTimer.stop()
+		self.onLayoutFinish.append(self.layoutFinished)
 
 	def layoutFinished(self):
-		pictureSize = self["picture"].getSize()
-		self.maxX = self.instance.size().width() - pictureSize[0]
-		self.maxY = self.instance.size().height() - pictureSize[1]
+		picturesize = self["picture"].getSize()
+		self.maxx = self.instance.size().width() - picturesize[0]
+		self.maxy = self.instance.size().height() - picturesize[1]
 		self.doMovePicture()
 
-	def doMovePicture(self):
-		self.posX = randrange(self.maxX)
-		self.posY = randrange(self.maxY)
-		self["picture"].instance.move(ePoint(self.posX, self.posY))
-		self.moveLogoTimer.startLongTimer(9)
+	def __onHide(self):
+		self.moveLogoTimer.stop()
+
+	def __onShow(self):
+		self.moveLogoTimer.startLongTimer(5)
 
 	def serviceStarted(self):
 		if self.shown:
 			ref = self.session.nav.getCurrentlyPlayingServiceOrGroup()
 			if ref:
 				ref = ref.toString().split(":")
-				flag = ref[2] == "2" or ref[2] == "A" or splitext(ref[10])[1].lower() in AUDIO_EXTENSIONS
-				if not flag:
+				if not os.path.splitext(ref[10])[1].lower() in AUDIO_EXTENSIONS:
 					self.hide()
+
+	def doMovePicture(self):
+		self.posx = random.randint(1, self.maxx)
+		self.posy = random.randint(1, self.maxy)
+		self["picture"].instance.move(ePoint(self.posx, self.posy))
+		self.moveLogoTimer.startLongTimer(5)

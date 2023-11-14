@@ -1,36 +1,13 @@
+from Screen import Screen
 import Screens.InfoBar
-from enigma import eServiceReference, eTimer, eListboxPythonConfigContent
-
-from Screens.Screen import Screen
 from Components.ServiceScan import ServiceScan as CScan
 from Components.ProgressBar import ProgressBar
 from Components.Label import Label
 from Components.ActionMap import ActionMap
-from Components.MenuList import MenuList
+from Components.FIFOList import FIFOList
 from Components.Sources.FrontendInfo import FrontendInfo
 from Components.config import config
-
-
-class FIFOList(MenuList):
-	def __init__(self, len=10):
-		self.len = len
-		self.list = []
-		MenuList.__init__(self, self.list)
-
-	def addItem(self, item):
-		self.list.append(item)
-		self.l.setList(self.list[-self.len:])
-
-	def clear(self):
-		del self.list[:]
-		self.l.setList(self.list)
-
-	def getCurrentSelection(self):
-		return self.list and self.getCurrent() or None
-
-	def listAll(self):
-		self.l.setList(self.list)
-		self.selectionEnabled(True)
+from enigma import eServiceReference
 
 
 class ServiceScanSummary(Screen):
@@ -57,27 +34,9 @@ class ServiceScanSummary(Screen):
 
 class ServiceScan(Screen):
 
-	def up(self):
-		self["servicelist"].up()
-		selectedService = self["servicelist"].getCurrentSelection()
-		if selectedService:
-			self.session.summary.updateService(selectedService[0])
-
-	def down(self):
-		self["servicelist"].down()
-		selectedService = self["servicelist"].getCurrentSelection()
-		if selectedService:
-			self.session.summary.updateService(selectedService[0])
-
 	def ok(self):
+		print "ok"
 		if self["scan"].isDone():
-			try:
-				from Plugins.SystemPlugins.LCNScanner.plugin import LCNBuildHelper
-				lcn = LCNBuildHelper()
-				lcn.buildAfterScan()
-			except Exception as e:
-				print(e)
-
 			if self.currentInfobar.__class__.__name__ == "InfoBar":
 				selectedService = self["servicelist"].getCurrentSelection()
 				if selectedService and self.currentServiceList is not None:
@@ -110,19 +69,17 @@ class ServiceScan(Screen):
 	def __init__(self, session, scanList):
 		Screen.__init__(self, session)
 
-		self["Title"] = Label(_("Scanning..."))
 		self.scanList = scanList
 
 		if hasattr(session, 'infobar'):
 			self.currentInfobar = Screens.InfoBar.InfoBar.instance
-			if self.currentInfobar:
-				self.currentServiceList = self.currentInfobar.servicelist
-				if self.session.pipshown and self.currentServiceList:
-					if self.currentServiceList.dopipzap:
-						self.currentServiceList.togglePipzap()
-					if hasattr(self.session, 'pip'):
-						del self.session.pip
-					self.session.pipshown = False
+			self.currentServiceList = self.currentInfobar.servicelist
+			if self.session.pipshown and self.currentServiceList:
+				if self.currentServiceList.dopipzap:
+					self.currentServiceList.togglePipzap()
+				if hasattr(self.session, 'pip'):
+					del self.session.pip
+				self.session.pipshown = False
 		else:
 			self.currentInfobar = None
 
@@ -134,15 +91,13 @@ class ServiceScan(Screen):
 		self["transponder"] = Label()
 
 		self["pass"] = Label("")
-		self["servicelist"] = FIFOList(len=10)
+		self["servicelist"] = FIFOList()
 		self["FrontendInfo"] = FrontendInfo()
 		self["key_red"] = Label(_("Cancel"))
 		self["key_green"] = Label(_("OK"))
 
 		self["actions"] = ActionMap(["SetupActions", "MenuActions"],
 		{
-			"up": self.up,
-			"down": self.down,
 			"ok": self.ok,
 			"save": self.ok,
 			"cancel": self.cancel,
@@ -150,21 +105,11 @@ class ServiceScan(Screen):
 		}, -2)
 		self.setTitle(_("Service scan"))
 		self.onFirstExecBegin.append(self.doServiceScan)
-		self.scanTimer = eTimer()
-		self.scanTimer.callback.append(self.scanPoll)
-
-	def scanPoll(self):
-		if self["scan"].isDone():
-			self.scanTimer.stop()
-			self["servicelist"].moveToIndex(0)
-			selectedService = self["servicelist"].getCurrentSelection()
-			if selectedService:
-				self.session.summary.updateService(selectedService[0])
 
 	def doServiceScan(self):
-		self["servicelist"].len = self["servicelist"].instance.size().height() // self["servicelist"].l.getItemSize().height()
+		self["servicelist"].len = self["servicelist"].instance.size().height() / self["servicelist"].l.getItemSize().height()
 		self["scan"] = CScan(self["scan_progress"], self["scan_state"], self["servicelist"], self["pass"], self.scanList, self["network"], self["transponder"], self["FrontendInfo"], self.session.summary)
-		self.scanTimer.start(250)
 
 	def createSummary(self):
+		print "ServiceScanCreateSummary"
 		return ServiceScanSummary

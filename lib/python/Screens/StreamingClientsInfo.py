@@ -1,9 +1,9 @@
-from Screens.Screen import Screen
+from Screen import Screen
 from Screens.MessageBox import MessageBox
 from Components.MenuList import MenuList
 from Components.ActionMap import ActionMap
 from Components.Sources.StreamService import StreamServiceList
-from Components.Button import Button
+from Components.Sources.StaticText import StaticText
 from Components.Label import Label
 from enigma import eStreamServer
 from ServiceReference import ServiceReference
@@ -13,16 +13,16 @@ try:
 except:
 	streamList = []
 
+
 class StreamingClientsInfo(Screen):
 	def __init__(self, session):
 		Screen.__init__(self, session)
-		self.nav = session.nav
 		self.streamServer = eStreamServer.getInstance()
 		self.clients = []
 		self["menu"] = MenuList(self.clients)
-		self["key_red"] = Button(_("Close"))
-		self["key_green"] = Button("")
-		self["key_yellow"] = Button("")
+		self["key_red"] = StaticText(_("Close"))
+		self["key_green"] = StaticText("")
+		self["key_yellow"] = StaticText("")
 		self["info"] = Label()
 		self.updateClients()
 		self["actions"] = ActionMap(["ColorActions", "SetupActions"],
@@ -49,35 +49,21 @@ class StreamingClientsInfo(Screen):
 					strtype = "T"
 				try:
 					raw = socket.gethostbyaddr(ip)
-					host = raw[0]
+					ip = raw[0]
 				except:
-					host = ""
-				info = ("%s %-8s %s %s") % (strtype, ip, host, service_name)
+					pass
+				info = ("%s %-8s %s") % (strtype, ip, service_name)
 				self.clients.append((info, (x[0], x[1])))
 		if StreamServiceList and streamList:
 			for x in StreamServiceList:
-				append = False
 				ip = "ip n/a"
 				service_name = "(unknown service)"
 				for stream in streamList:
 					if hasattr(stream, 'getService') and stream.getService() and stream.getService().__deref__() == x:
 						service_name = ServiceReference(stream.ref.toString()).getServiceName()
 						ip = stream.clientIP or ip
-						try:
-							ip2 = ip.split(":")[-1]
-						except:
-							pass
-						try:
-							raw = socket.gethostbyaddr(ip2)
-							host = raw[0]
-						except:
-							host = ""
-						info = ("T %s %s %s %s") % (ip, host, service_name, _("(VU+ type)"))
-						if not (info,(-1, x)) in self.clients:
-							append = True
-							break
-				if append:
-					self.clients.append((info,(-1, x)))
+			info = ("T %s %s %s") % (ip, service_name, _("(VU+ type)"))
+			self.clients.append((info, (-1, x)))
 		self["menu"].setList(self.clients)
 		if self.clients:
 			self["info"].setText("")
@@ -91,29 +77,17 @@ class StreamingClientsInfo(Screen):
 		if self.clients:
 			client = self["menu"].l.getCurrentSelection()
 			if client:
-				self.session.openWithCallback(self.stopCurrentStreamCallback, MessageBox, client[0] +" \n\n" + _("Stop current stream") + "?", MessageBox.TYPE_YESNO)
+				self.session.openWithCallback(self.stopCurrentStreamCallback, MessageBox, client[0] + " \n\n" + _("Stop current stream") + "?", MessageBox.TYPE_YESNO)
 
 	def stopCurrentStreamCallback(self, answer):
 		if answer:
 			client = self["menu"].l.getCurrentSelection()
-			if client:
-				if client[1][0] != -1:
-					if self.streamServer:
-						for x in self.streamServer.getConnectedClients():
-							if client[1][0] == x[0] and client[1][1] == x[1]:
-								if not self.streamServer.stopStreamClient(client[1][0], client[1][1]):
-									self.session.open(MessageBox,  client[0] +" \n\n" + _("Error stop stream!"), MessageBox.TYPE_WARNING)
-				elif StreamServiceList and streamList:
-					for x in streamList[:]:
-						if hasattr(x, 'getService') and x.getService() and x.getService().__deref__() == client[1][1]:
-							x.request.write("-STOP STREAM\n")
-							service=x.getService()
-							self.nav.stopRecordService(service)
-							x.request.finish()
-							if x in streamList:
-								streamList.remove(x)
+			if client and client[1][0] != -1 and self.streamServer:
+				for x in self.streamServer.getConnectedClients():
+					if client[1][0] == x[0] and client[1][1] == x[1]:
+						if not self.streamServer.stopStreamClient(client[1][0], client[1][1]):
+							self.session.open(MessageBox, client[0] + " \n\n" + _("Error stop stream!"), MessageBox.TYPE_WARNING)
 				self.updateClients()
-
 
 	def stopAllStreams(self):
 		self.updateClients()
@@ -125,15 +99,6 @@ class StreamingClientsInfo(Screen):
 			if self.streamServer:
 				for x in self.streamServer.getConnectedClients():
 					self.streamServer.stopStream()
-			if StreamServiceList and streamList:
-				for x in streamList[:]:
-					if hasattr(x, 'execEnd'):
-						x.request.write("-STOP STREAM\n")
-						service=x.getService()
-						self.nav.stopRecordService(service)
-						x.request.finish()
-						if x in streamList:
-							streamList.remove(x)
 			self.updateClients()
 			if not self.clients:
 				self.close()
