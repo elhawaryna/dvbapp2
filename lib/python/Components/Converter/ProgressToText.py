@@ -2,7 +2,7 @@ from Components.Converter.Converter import Converter
 from Components.Element import cached
 
 
-class ProgressToText(Converter):
+class ProgressToText(Converter, object):
 	def __init__(self, type):
 		Converter.__init__(self, type)
 		self.in_percent = "InPercent" in type.split(',')

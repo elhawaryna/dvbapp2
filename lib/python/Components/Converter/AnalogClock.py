@@ -1,44 +1,34 @@
-# original code is from openmips gb Team: [OMaclock] Converter #
-# Thx to arn354 #
-
 from Components.Converter.Converter import Converter
-from time import localtime
 from Components.Element import cached
+from time import localtime, strftime
 
 
-class AnalogClock(Converter):
-	DEFAULT = 0
-	OMA_SEC = 1
-	OMA_MIN = 2
-	OMA_HOUR = 3
+class AnalogClock(Converter, object):
 
 	def __init__(self, type):
 		Converter.__init__(self, type)
 		if type == "Seconds":
-			self.type = self.OMA_SEC
+			self.type = 1
 		elif type == "Minutes":
-			self.type = self.OMA_MIN
+			self.type = 2
 		elif type == "Hours":
-			self.type = self.OMA_HOUR
+			self.type = 3
 		else:
-			self.type = self.DEFAULT
+			self.type = -1
 
 	@cached
-	def getText(self):
+	def getValue(self):
 		time = self.source.time
 		if time is None:
-			return ""
+			return 0
 
 		t = localtime(time)
 
-		if self.type == self.OMA_SEC:
-			return "%02d,sec" % t.tm_sec
-		elif self.type == self.OMA_MIN:
-			return "%02d,min" % t.tm_min
-		elif self.type == self.OMA_HOUR:
-			ret = (t.tm_hour * 5) + (t.tm_min / 12)
-			return "%02d,hour" % ret
-		else:
-			return "???"
+		if self.type == 1:
+			return int((t.tm_sec * 100) / 60)
+		elif self.type == 2:
+			return int((t.tm_min * 100) / 60)
+		elif self.type == 3:
+			return int(((t.tm_hour * 100) / 12) + (t.tm_min / 8))
 
-	text = property(getText)
+	value = property(getValue)

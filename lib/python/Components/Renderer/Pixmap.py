@@ -1,6 +1,6 @@
-from enigma import ePixmap
+from Renderer import Renderer
 
-from Components.Renderer.Renderer import Renderer
+from enigma import ePixmap
 
 
 class Pixmap(Renderer):

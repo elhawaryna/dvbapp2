@@ -1,5 +1,5 @@
 from Components.VariableValue import VariableValue
-from Components.Renderer.Renderer import Renderer
+from Renderer import Renderer
 
 from enigma import eSlider
 
@@ -22,12 +22,6 @@ class Progress(VariableValue, Renderer):
 		value = self.source.value
 		if value is None:
 			value = 0
-		if range > 2**31 - 1:
-			range = 2**31 - 1
-		if value > range:
-			value = range
-		if value < 0:
-			value = 0
 		(self.range, self.value) = ((0, range), value)
 
 	def postWidgetCreate(self, instance):
@@ -39,6 +33,6 @@ class Progress(VariableValue, Renderer):
 			self.instance.setRange(self.__start, self.__end)
 
 	def getRange(self):
-		return self.__start, self.__end
+		return (self.__start, self.__end)
 
 	range = property(getRange, setRange)

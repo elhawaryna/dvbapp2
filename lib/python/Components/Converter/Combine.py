@@ -1,8 +1,8 @@
-from Components.Converter.Converter import Converter
+from Converter import Converter
 from Components.Element import cached
 
 
-class Combine(Converter):
+class Combine(Converter, object):
 	SINGLE_SOURCE = False
 
 	def __init__(self, arg=None, func=None):

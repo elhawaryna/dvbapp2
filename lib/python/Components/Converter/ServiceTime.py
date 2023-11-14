@@ -1,9 +1,9 @@
-from Components.Converter.Converter import Converter
+from Converter import Converter
 from Components.Element import cached, ElementError
 from enigma import iServiceInformation
 
 
-class ServiceTime(Converter):
+class ServiceTime(Converter, object):
 	STARTTIME = 0
 	ENDTIME = 1
 	DURATION = 2
@@ -31,14 +31,9 @@ class ServiceTime(Converter):
 			return info.getInfo(service, iServiceInformation.sTimeCreate)
 		elif self.type == self.ENDTIME:
 			begin = info.getInfo(service, iServiceInformation.sTimeCreate)
-			len = info.getLength(service) + 10 # added 10 seconds to fix round to minutes
+			len = info.getLength(service)
 			return begin + len
 		elif self.type == self.DURATION:
-			len = info.getLength(service)
-			if len == -1: # try to get duration from event
-				ev = info.getEvent(service)
-				if ev:
-					len = ev.getDuration()
-			return len + 10 # added 10 seconds to fix round to minutes
+			return info.getLength(service)
 
 	time = property(getTime)
