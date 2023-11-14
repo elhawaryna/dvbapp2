@@ -5,5 +5,5 @@ from enigma import eLabel
 # particularly in a complex screen like the graph EPG
 
 
-def getTextBoundarySize(instance, font, targetSize, text, nowrap=False):
-	return eLabel.calculateTextSize(font, text, targetSize, nowrap)
+def getTextBoundarySize(instance, font, targetSize, text):
+	return eLabel.calculateTextSize(font, text, targetSize)

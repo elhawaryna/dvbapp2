@@ -1,29 +1,32 @@
 from enigma import eDVBFrontendParametersSatellite, eDVBFrontendParametersCable, eDVBFrontendParametersTerrestrial, eDVBFrontendParametersATSC
 from Components.NimManager import nimmanager
-
-SIGN = "\u00B0"
+from Components.config import config
 
 
 def orbpos(pos):
-	return pos > 3600 and "N/A" or "%d.%d%s%s" % (pos > 1800 and ((3600 - pos) / 10, (3600 - pos) % 10, SIGN, "W") or (pos / 10, pos % 10, SIGN, "E"))
+	return pos > 3600 and "N/A" or "%d.%d\xc2\xb0%s" % (pos > 1800 and ((3600 - pos) / 10, (3600 - pos) % 10, "W") or (pos / 10, pos % 10, "E"))
 
 
 def getTunerDescription(nim):
 	try:
 		return nimmanager.getTerrestrialDescription(nim)
 	except:
-		print("[Transponder] nimmanager.getTerrestrialDescription(nim) failed, nim: %s" % nim)
+		print "[Transponder] nimmanager.getTerrestrialDescription(nim) failed, nim:", nim
+		try:
+			print "[Transponder] trying use fallback", config.usage.remote_fallback_dvbt_region.value
+			return config.usage.remote_fallback_dvbt_region.value
+		except:
+			print "[Transponder] no description"
 	return ""
 
 
 def getMHz(frequency):
-	if str(frequency).endswith('MHz'):
-		return frequency.split()[0]
-	return (frequency + 50000) // 100000 // 10.
-
+	return (frequency + 50000) / 100000 / 10.
 
 # Note: newly added region add into ImportChannels to getTerrestrialRegion()
-# due using for fallback tuner too
+#	due using for fallback tuner too
+
+
 def getChannelNumber(frequency, nim):
 	if nim == "DVB-T":
 		for n in nimmanager.nim_slots:
@@ -36,24 +39,22 @@ def getChannelNumber(frequency, nim):
 		if "Europe" in descr:
 			if 174 < f < 230: 	# III
 				d = (f + 1) % 7
-				return str(int(f - 174) // 7 + 5) + (d < 3 and "-" or d > 4 and "+" or "")
+				return str(int(f - 174) / 7 + 5) + (d < 3 and "-" or d > 4 and "+" or "")
 			elif 470 <= f < 863: 	# IV,V
 				d = (f + 2) % 8
-				return str(int(f - 470) // 8 + 21) + (d < 3.5 and "-" or d > 4.5 and "+" or "")
-		elif "Zealand" in descr and 506 <= f <= 700:
-			return str(int(f - 506) // 8 + 25)
+				return str(int(f - 470) / 8 + 21) + (d < 3.5 and "-" or d > 4.5 and "+" or "")
 		elif "Australia" in descr:
 			d = (f + 1) % 7
 			ds = (d < 3 and "-" or d > 4 and "+" or "")
 			if 174 < f < 202: 	# CH6-CH9
-				return str(int(f - 174) // 7 + 6) + ds
+				return str(int(f - 174) / 7 + 6) + ds
 			elif 202 <= f < 209: 	# CH9A
 				return "9A" + ds
 			elif 209 <= f < 230: 	# CH10-CH12
-				return str(int(f - 209) // 7 + 10) + ds
+				return str(int(f - 209) / 7 + 10) + ds
 			elif 526 < f < 820: 	# CH28-CH69
 				d = (f - 1) % 7
-				return str(int(f - 526) // 7 + 28) + (d < 3 and "-" or d > 4 and "+" or "")
+				return str(int(f - 526) / 7 + 28) + (d < 3 and "-" or d > 4 and "+" or "")
 	return ""
 
 
@@ -69,21 +70,7 @@ def channel2frequency(channel, nim):
 			return (177500 + 7000 * (channel - 5)) * 1000
 		elif 21 <= channel <= 69:
 			return (474000 + 8000 * (channel - 21)) * 1000
-		else:
-			return None  # FIXME
-	elif "Zealand" in descr and 25 <= channel <= 50:
-		return (506000 + 8000 * (int(channel) - 25)) * 1000
-	else:  # Australian rules
-		res = 474000000
-		if channel != "9A":
-			ch = int(channel)
-			if 6 <= ch <= 9:
-				res = (177500 + 7000 * (ch - 6)) * 1000
-			elif 10 <= ch <= 12:
-				res = (212500 + 7000 * (ch - 10)) * 1000
-			elif 28 <= ch <= 69:
-				res = (529500 + 7000 * (ch - 28)) * 1000
-		return res
+	return 474000000
 
 
 def ConvertToHumanReadable(tp, tunertype=None):
@@ -150,6 +137,7 @@ def ConvertToHumanReadable(tp, tunertype=None):
 			ret["pls_mode"] = None
 			ret["is_id"] = None
 			ret["pls_code"] = None
+			ret["t2mi_plp_id"] = None
 	elif tunertype == "DVB-C":
 		ret["tuner_type"] = _("Cable")
 		ret["modulation"] = {
@@ -248,7 +236,8 @@ def ConvertToHumanReadable(tp, tunertype=None):
 			eDVBFrontendParametersTerrestrial.System_DVB_T_T2: "DVB-T/T2",
 			eDVBFrontendParametersTerrestrial.System_DVB_T: "DVB-T",
 			eDVBFrontendParametersTerrestrial.System_DVB_T2: "DVB-T2"}.get(tp.get("system"))
-		ret["channel"] = _("CH%s") % getChannelNumber(tp.get("frequency"), "DVB-T")
+		channel = getChannelNumber(tp.get("frequency"), "DVB-T")
+		ret["channel"] = _("CH%s") % channel if channel else ""
 	elif tunertype == "ATSC":
 		ret["tuner_type"] = "ATSC"
 		ret["modulation"] = {
@@ -268,8 +257,8 @@ def ConvertToHumanReadable(tp, tunertype=None):
 			eDVBFrontendParametersATSC.System_ATSC: "ATSC",
 			eDVBFrontendParametersATSC.System_DVB_C_ANNEX_B: "DVB-C ANNEX B"}.get(tp.get("system"))
 	elif tunertype != "None":
-		print("[Transponder] ConvertToHumanReadable: no or unknown tunertype in tpdata dict for tunertype: %s" % tunertype)
-	for k, v in list(tp.items()):
+		print "ConvertToHumanReadable: no or unknown tunertype in tpdata dict for tunertype:", tunertype
+	for k, v in tp.items():
 		if k not in ret:
 			ret[k] = v
 	return ret
